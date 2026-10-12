@@ -1,0 +1,4 @@
+nome,url,seletor_css,preco_ideal,preco_promocao,status,ultima_verificacao
+
+
+Livro Teste,https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html,.price_color,60,,,

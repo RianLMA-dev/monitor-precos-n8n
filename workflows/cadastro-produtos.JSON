@@ -1,0 +1,250 @@
+{
+  "name": "Cadastro de Produtos",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Cadastro de Produto",
+        "formDescription": "Informe o produto que deve ser monitorado",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Nome do produto",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Link do produto",
+              "placeholder": "https://...",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Seletor CSS",
+              "placeholder": ".price_color",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Preço ideal (R$)",
+              "fieldType": "number",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "path": "cadastro-produto"
+        }
+      },
+      "id": "98b3db92-f710-464d-bfaf-cf83d3996797",
+      "name": "Formulário de Cadastro",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        96
+      ],
+      "webhookId": "0ccc4c6a-559e-4415-9180-032faf414f41"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ String($json[\"Link do produto\"] ?? \"\").trim() }}",
+              "rightValue": "https://",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "326182b8-2ede-49b9-95ab-d785561af0f8",
+      "name": "Link válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentID": {
+          "__rl": true,
+          "mode": "list",
+          "value": "SEU_ID_DA_PLANILHA",
+          "cachedResultName": "Automação E-commerce"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gid=0",
+          "cachedResultName": "produtos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nome": "={{ $json[\"Nome do produto\"] }}",
+            "url": "={{ String($json[\"Link do produto\"]).trim() }}",
+            "seletor_css": "={{ String($json[\"Seletor CSS\"]).trim() }}",
+            "preco_ideal": "={{ $json[\"Preço ideal (R$)\"] }}"
+          },
+          "matchingColumns": [
+            "url"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "seletor_css",
+              "displayName": "seletor_css",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "preco_ideal",
+              "displayName": "preco_ideal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "23fe6979-cb8e-42cb-81a6-5e03751b7257",
+      "name": "Salvar Produto na Planilha",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Cc6VtTMzy65UHSh9",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Produto cadastrado!",
+        "completionMessage": "Ele será monitorado na próxima verificação.",
+        "options": {}
+      },
+      "id": "5a4a39e6-52aa-4393-92b7-413695303571",
+      "name": "Produto Cadastrado",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        672,
+        0
+      ],
+      "webhookId": "0c470e49-8f57-4641-bcb6-e9c5670b618a"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Link inválido",
+        "completionMessage": "O link deve começar com https://",
+        "options": {}
+      },
+      "id": "65028a4b-bbd6-4462-98db-771c6de66faf",
+      "name": "Link Inválido",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        192
+      ],
+      "webhookId": "ea4adb72-a63c-41f5-9a7e-077e42b9fd7a"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Formulário de Cadastro": {
+      "main": [
+        [
+          {
+            "node": "Link válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link válido?": {
+      "main": [
+        [
+          {
+            "node": "Salvar Produto na Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Link Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar Produto na Planilha": {
+      "main": [
+        [
+          {
+            "node": "Produto Cadastrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "d902771b-def5-4820-b24d-1420182b363b",
+  "meta": {
+    "instanceId": "c94e74a3c08171b8f787ce81284612fd6ae97786a818bc00415becbcc0c5c23c"
+  },
+  "nodeGroups": [],
+  "id": "2QrE0Ju7qhj41IbQ",
+  "tags": []
+}

@@ -1,0 +1,556 @@
+{
+  "name": "Monitoramento de Preços",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "b032271a-bebd-4374-b8ad-15c4d2a9289f",
+      "name": "A cada 6 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_ID_DA_PLANILHA",
+          "mode": "list",
+          "cachedResultName": "Automação E-commerce",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/SEU_ID_DA_PLANILHA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "produtos",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/SEU_ID_DA_PLANILHA/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "659cb43d-83c0-495a-a579-dc0df01e4dc8",
+      "name": "Ler Produtos da Planilha",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        320
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Cc6VtTMzy65UHSh9",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "pt-BR,pt;q=0.9,en;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "994a477a-fde4-40e0-9f6b-e709605c910a",
+      "name": "Baixar Página do Produto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        192
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const produto = $('Loop Over Products').item.json;\nconst html = $('Baixar Página do Produto').item.json.data || '';\nconst textoCss = $input.item.json.preco_texto || '';\n\nfunction toNumber(v) {\n  if (typeof v === 'number') return v;\n  const s = String(v || '').replace(/[^\\d,.-]/g, '');\n  if (!s) return NaN;\n  if (s.includes(',')) return parseFloat(s.replace(/\\./g, '').replace(',', '.'));\n  if (/^\\d{1,3}(\\.\\d{3})+$/.test(s)) return parseFloat(s.replace(/\\./g, ''));\n  return parseFloat(s);\n}\n\nfunction lerJsonLd(h) {\n  const m = h.match(/\"@type\"\\s*:\\s*\"Offer\"[^}]*?\"price\"\\s*:\\s*\"?([\\d.,]+)\"?/);\n  return m ? m[1] : '';\n}\n\n// Ordem de tentativa: JSON-LD primeiro, CSS como alternativa.\n// Se a planilha tiver a coluna \"metodo\" com o valor \"css\", inverte a ordem.\nconst preferirCss = String(produto.metodo || '').toLowerCase() === 'css';\nconst tentativas = preferirCss\n  ? [['css', textoCss], ['jsonld', lerJsonLd(html)]]\n  : [['jsonld', lerJsonLd(html)], ['css', textoCss]];\n\nlet texto = '';\nlet fonte = '';\nfor (const [nome, valor] of tentativas) {\n  if (valor && !isNaN(toNumber(valor))) {\n    texto = valor;\n    fonte = nome;\n    break;\n  }\n}\n\nconst precoSite = toNumber(texto);\nconst ideal = toNumber(produto.preco_ideal);\nconst anterior = toNumber(produto.preco_promocao);\n\nconst erro = isNaN(precoSite);\nconst precoFinal = erro ? (isNaN(anterior) ? '' : anterior) : precoSite;\n\nlet status;\nif (erro) status = 'Erro na leitura';\nelse status = precoSite <= ideal ? 'Abaixo do ideal' : 'Acima do ideal';\n\nconst alerta = !erro && precoSite <= ideal && precoSite !== anterior;\n\nreturn {\n  json: {\n    nome: produto.nome,\n    url: produto.url,\n    preco_ideal: ideal,\n    preco_promocao: precoFinal,\n    status,\n    ultima_verificacao: new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }),\n    fonte_leitura: fonte,\n    erro,\n    alerta\n  }\n};"
+      },
+      "id": "551ccc7f-402b-4d97-802c-d2bf0a8fe8e4",
+      "name": "Converter e Comparar Preço",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "SEU_ID_DA_PLANILHA",
+          "mode": "list",
+          "cachedResultName": "Automação E-commerce",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/SEU_ID_DA_PLANILHA/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "produtos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ $json.url }}",
+            "preco_promocao": "={{ $json.preco_promocao }}",
+            "status": "={{ $json.status }}",
+            "ultima_verificacao": "={{ $json.ultima_verificacao }}"
+          },
+          "matchingColumns": [
+            "url"
+          ],
+          "schema": [
+            {
+              "id": "nome",
+              "displayName": "nome",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seletor_css",
+              "displayName": "seletor_css",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "preco_ideal",
+              "displayName": "preco_ideal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "preco_promocao",
+              "displayName": "preco_promocao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ultima_verificacao",
+              "displayName": "ultima_verificacao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c2335ba7-39cc-4c04-a1dc-1e76ab12bf31",
+      "name": "Atualizar Linha do Produto",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1408,
+        176
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Cc6VtTMzy65UHSh9",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Converter e Comparar Preço').item.json.erro }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "069dc515-9229-43d4-bc20-5eee13b328c2"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Erro"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Converter e Comparar Preço').item.json.alerta }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "47434aae-90f9-4b79-810a-73aeccd17c1d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Alerta"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Sem aviso"
+        }
+      },
+      "id": "c3f12e24-9f16-4c93-b3e8-bdc1acd073d2",
+      "name": "Erro, Alerta ou Nada?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1632,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "id": "7d5d386f-2035-46b9-b9f6-25bf8b48d323",
+      "name": "Aguardar 3 segundos",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        208
+      ],
+      "webhookId": "7af51025-17c3-4ede-8641-007f972b9b96"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "cbc1a1fd-c97c-4608-a1a4-3217dea45111",
+      "name": "Loop Over Products",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        528,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ **Falha ao ler o preço de {{ $('Converter e Comparar Preço').item.json.nome }}**\nVerifique o seletor CSS ou se o site bloqueou o acesso.\n{{ $('Converter e Comparar Preço').item.json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        96
+      ],
+      "id": "a3621c1c-6949-42e0-9ad8-82a599749b0b",
+      "name": "Discord: Falha na leitura",
+      "webhookId": "880502c7-661c-4957-ae2e-5fdf0d672828",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "e5Gw1SSsyPcn9jwO",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=🔔 **Preço baixou!**\n**{{ $('Converter e Comparar Preço').item.json.nome }}** está por **R$ {{ Number($('Converter e Comparar Preço').item.json.preco_promocao).toFixed(2).replace('.', ',') }}**\nSeu preço ideal: R$ {{ Number($('Converter e Comparar Preço').item.json.preco_ideal).toFixed(2).replace('.', ',') }}\n{{ $('Converter e Comparar Preço').item.json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        272
+      ],
+      "id": "daf1eb88-2bf3-4d09-a4d6-30d58fb21f17",
+      "name": "Discord: Alerta de preços",
+      "webhookId": "880502c7-661c-4957-ae2e-5fdf0d672828",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "e5Gw1SSsyPcn9jwO",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "preco_texto",
+              "cssSelector": "={{ $('Loop Over Products').item.json.seletor_css }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        192
+      ],
+      "id": "91c427e7-0388-4f63-b66f-da82814cd86c",
+      "name": "Extrair Texto do Preço",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "A cada 6 horas": {
+      "main": [
+        [
+          {
+            "node": "Ler Produtos da Planilha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler Produtos da Planilha": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar Página do Produto": {
+      "main": [
+        [
+          {
+            "node": "Extrair Texto do Preço",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Converter e Comparar Preço": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Linha do Produto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Linha do Produto": {
+      "main": [
+        [
+          {
+            "node": "Erro, Alerta ou Nada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Erro, Alerta ou Nada?": {
+      "main": [
+        [
+          {
+            "node": "Discord: Falha na leitura",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discord: Alerta de preços",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aguardar 3 segundos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar 3 segundos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Products": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Baixar Página do Produto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord: Alerta de preços": {
+      "main": [
+        [
+          {
+            "node": "Aguardar 3 segundos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord: Falha na leitura": {
+      "main": [
+        [
+          {
+            "node": "Aguardar 3 segundos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Texto do Preço": {
+      "main": [
+        [
+          {
+            "node": "Converter e Comparar Preço",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4112f9c5-15b3-4495-b2f9-3314cff2d2a8",
+  "nodeGroups": [],
+  "id": "kPaumE7IEgq7dvyd",
+  "tags": []
+}
