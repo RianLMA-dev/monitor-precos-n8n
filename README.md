@@ -1,6 +1,6 @@
 # Monitor de Preços
 
-Fiz esse projeto para como uma curiosidade sobre o n8n. Ele lê uma lista de produtos numa planilha do Google Sheets, abre a página de cada um, pega o preço e escreve de volta na planilha. Se o preço estiver no valor que eu quero pagar, manda uma mensagem no Discord.
+Fiz esse projeto para me ajudar a encontrar promoções de produtos desejados. Ele lê uma lista de produtos numa planilha do Google Sheets, abre a página de cada um, pega o preço e escreve de volta na planilha. Se o preço estiver no valor que eu quero pagar, manda uma mensagem no Discord.
 
 **Stack:** n8n, Google Sheets, Discord (webhook) e JavaScript.
 
